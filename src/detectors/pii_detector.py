@@ -45,7 +45,8 @@ class PIIDetector(BaseDetector):
             d1 = 0
         if d1 != int(digits[9]):
             return False
-        total = sum(int(digits[i]) * (self.CPF_WEIGHTS[i] + 1 if i < 9 else 1) for i in range(10))
+        # Second check digit: weights 11..2 over the first 10 digits.
+        total = sum(int(digits[i]) * (11 - i) for i in range(10))
         d2 = (total * 10) % 11
         if d2 == 10:
             d2 = 0

@@ -134,3 +134,47 @@ class TestIntegration:
         assert "cpf" in types
         assert "credit_card" in types
         assert "email" in types
+
+
+SECRETS = {
+    "cpf": "529.982.247-25",
+    "card": "4111 1111 1111 1111",
+    "password": "MyS3cur3P@ss!",
+    "email": "admin@company.com",
+}
+
+
+def _scan_sensitive_file(tmp_path):
+    (tmp_path / "leak.txt").write_text(
+        f"CPF: {SECRETS['cpf']} Card: {SECRETS['card']}\n"
+        f"password = {SECRETS['password']}\n"
+        f"Email: {SECRETS['email']}\n",
+        encoding="utf-8",
+    )
+    scanner = FilesystemScanner()
+    for detector in (PIIDetector(), CreditCardDetector(), CredentialDetector()):
+        scanner.add_detector(detector)
+    return scanner.scan(str(tmp_path))
+
+
+@pytest.mark.parametrize("fmt", ["json", "html"])
+def test_reports_never_contain_the_sensitive_values(tmp_path, fmt):
+    from reporters.html_reporter import HTMLReporter
+    from reporters.json_reporter import JSONReporter
+
+    result = _scan_sensitive_file(tmp_path)
+    assert result.total_findings >= 4
+    reporter = JSONReporter() if fmt == "json" else HTMLReporter()
+    output = reporter.generate(result)
+    for name, secret in SECRETS.items():
+        assert secret not in output, f"{name} leaked into the {fmt} report"
+
+
+def test_html_report_escapes_scanned_content(tmp_path):
+    from reporters.html_reporter import HTMLReporter
+
+    (tmp_path / "x.txt").write_text("<script>alert(1)</script> CPF: 529.982.247-25", encoding="utf-8")
+    scanner = FilesystemScanner()
+    scanner.add_detector(PIIDetector())
+    output = HTMLReporter().generate(scanner.scan(str(tmp_path)))
+    assert "<script>alert(1)" not in output

@@ -6,6 +6,39 @@ from typing import List, Dict, Any, Optional
 logger = logging.getLogger(__name__)
 
 
+_TOKEN = re.compile(r"\S+")
+
+
+def mask_text(value: str) -> str:
+    """Keep the first and last two characters, hide the rest."""
+    if len(value) <= 6:
+        return value[:1] + "*" * (len(value) - 1)
+    return value[:2] + "*" * (len(value) - 4) + value[-2:]
+
+
+def _mask_if_sensitive(match: "re.Match[str]") -> str:
+    word = match.group(0)
+    if any(ch.isdigit() for ch in word) or "@" in word or len(word) >= 12:
+        return mask_text(word)
+    return word
+
+
+def safe_context(content: str, start: int, end: int, max_chars: int = 40) -> str:
+    """Label text before a match plus the masked match.
+
+    Reports must not become a new copy of the sensitive data they point to,
+    so only the text *before* the match on the same line is kept (usually a
+    label such as "CPF:" or "password ="). Any word in it that could itself be
+    sensitive (has a digit or "@", or is 12+ characters long) is masked, and
+    so is the match. Text after the match is dropped because it often holds
+    the next sensitive value.
+    """
+    line_start = content.rfind("\n", 0, start) + 1
+    before = content[max(line_start, start - max_chars) : start]
+    before = _TOKEN.sub(_mask_if_sensitive, before)
+    return (before + mask_text(content[start:end].strip())).strip()
+
+
 class Finding:
     def __init__(
         self,
@@ -48,10 +81,7 @@ class Finding:
         }
 
     def mask_value(self) -> str:
-        v = self.value
-        if len(v) <= 6:
-            return v[:1] + "*" * (len(v) - 1)
-        return v[:2] + "*" * (len(v) - 4) + v[-2:]
+        return mask_text(self.value)
 
     def __repr__(self) -> str:
         return f"Finding(type={self.detector_type}, subtype={self.subtype}, severity={self.severity})"
@@ -91,9 +121,7 @@ class BaseDetector(ABC):
             if not value:
                 continue
 
-            start = max(0, match.start() - context_chars)
-            end = min(len(content), match.end() + context_chars)
-            context = content[start:end].replace("\n", " ").strip()
+            context = safe_context(content, match.start(), match.end(), context_chars)
 
             line_num = content[: match.start()].count("\n") + 1
 

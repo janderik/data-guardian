@@ -131,6 +131,74 @@ class TestCredentialDetector:
         assert len(secret_findings) > 0
 
 
+    def test_private_key_formats(self):
+        for header in (
+            "-----BEGIN OPENSSH PRIVATE KEY-----",
+            "-----BEGIN EC PRIVATE KEY-----",
+            "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+            "-----BEGIN PRIVATE KEY-----",
+        ):
+            findings = self.detector.scan(header)
+            assert [f for f in findings if f.subtype == "private_key"], header
+
+    def test_aws_secret_requires_context(self):
+        git_hash = "commit 4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+        assert not [f for f in self.detector.scan(git_hash) if f.subtype == "aws_secret"]
+        line = "aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+        assert [f for f in self.detector.scan(line) if f.subtype == "aws_secret"]
+
+
+
+def _reference_cpf(rng):
+    """Independent implementation of the CPF check-digit algorithm."""
+    digits = [rng.randint(0, 9) for _ in range(9)]
+    if len(set(digits)) == 1:
+        digits[0] = (digits[0] + 1) % 10
+    for size in (9, 10):
+        total = sum(d * (size + 1 - i) for i, d in enumerate(digits))
+        rest = (total * 10) % 11
+        digits.append(0 if rest == 10 else rest)
+    return "".join(map(str, digits))
+
+
+def test_cpf_validator_against_reference_implementation():
+    import random
+
+    detector = PIIDetector()
+    rng = random.Random(42)
+    for _ in range(500):
+        cpf = _reference_cpf(rng)
+        assert detector._validate_cpf(cpf), cpf
+        wrong = cpf[:-1] + str((int(cpf[-1]) + 1) % 10)
+        assert not detector._validate_cpf(wrong), wrong
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Diners 3056 930902 5904",
+        "Elo 6362970000457013",
+        "Hipercard 6062825624254001",
+        "MC 2-series 2223003122003222",
+        "Discover 6011-1111-1111-1117",
+    ],
+)
+def test_credit_card_brands_detected(text):
+    assert CreditCardDetector().scan(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Luhn-valid but no brand 1000000000000008",
+        "mixed separators 4111-1111 1111 1111",
+        "phone 11 98765-4321",
+    ],
+)
+def test_credit_card_false_positives_rejected(text):
+    assert not CreditCardDetector().scan(text)
+
+
 class TestCustomRulesDetector:
     def test_add_rule_dynamically(self):
         detector = CustomRulesDetector()

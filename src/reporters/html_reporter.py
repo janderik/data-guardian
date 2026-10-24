@@ -1,3 +1,4 @@
+import html as html_lib
 import datetime
 from typing import Any, List
 from .base import BaseReporter
@@ -31,13 +32,16 @@ class HTMLReporter(BaseReporter):
         rows_html = ""
         for i, f in enumerate(findings, 1):
             if isinstance(f, dict):
+                # Everything below comes from scanned files: escape it.
                 sev = f.get("severity", "medium")
-                subtype = f.get("subtype", "unknown")
-                file_path = f.get("file_path", "")
-                risk = f.get("risk", "")
-                context = f.get("context", "")
-                line = f.get("line", 0)
-                masked = f.get("value", "")
+                if sev not in ("critical", "high", "medium", "low"):
+                    sev = "medium"
+                subtype = html_lib.escape(str(f.get("subtype", "unknown")))
+                file_path = html_lib.escape(str(f.get("file_path", "")))
+                risk = html_lib.escape(str(f.get("risk", "")))
+                context = html_lib.escape(str(f.get("context", ""))[:80])
+                line = int(f.get("line", 0) or 0)
+                masked = html_lib.escape(str(f.get("value", "")))
 
                 color = {"critical": "#dc3545", "high": "#fd7e14", "medium": "#ffc107", "low": "#28a745"}.get(sev, "#6c757d")
 
@@ -48,7 +52,7 @@ class HTMLReporter(BaseReporter):
                     <td>{subtype}</td>
                     <td><code>{masked}</code></td>
                     <td>{file_path}:{line}</td>
-                    <td>{context[:80]}</td>
+                    <td>{context}</td>
                 </tr>"""
 
         report_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")

@@ -1,8 +1,8 @@
 # 🛡️ DataGuardian - Data Security Scanner
 
-![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)
+![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
-![CI](https://img.shields.io/badge/CI-Passing-brightgreen.svg)
+[![CI](https://github.com/janderik/data-guardian/actions/workflows/ci.yml/badge.svg)](https://github.com/janderik/data-guardian/actions/workflows/ci.yml)
 ![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)
 
 **DataGuardian** is a powerful, extensible data security scanner that discovers sensitive information across databases, filesystems, and file archives. It detects PII (Brazilian CPF, CNPJ, RG), credit card numbers, credentials, API keys, and custom patterns.
@@ -30,7 +30,7 @@ pip install dataguardian
 ### From source
 
 ```bash
-git clone https://github.com/yourusername/data-guardian.git
+git clone https://github.com/janderik/data-guardian.git
 cd data-guardian
 pip install -e .
 ```

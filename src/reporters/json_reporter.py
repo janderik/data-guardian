@@ -27,8 +27,8 @@ class JSONReporter(BaseReporter):
 
         return output
 
-    @staticmethod
-    def _build_summary(results: Any) -> dict:
+    @classmethod
+    def _build_summary(cls, results: Any) -> dict:
         if isinstance(results, list):
             total = sum(
                 r.total_findings if hasattr(r, "total_findings") else len(r.get("findings", [])) if isinstance(r, dict) else 0
@@ -47,7 +47,7 @@ class JSONReporter(BaseReporter):
         return {
             "total_findings": total,
             "total_scanned": files,
-            "severity_counts": self._count_severities(results),
+            "severity_counts": cls._count_severities(results),
         }
 
     @staticmethod
